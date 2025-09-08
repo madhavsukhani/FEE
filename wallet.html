@@ -17,18 +17,223 @@
                 <a href="receive.html">Receive</a>
                 <a href="support.html">Support</a>
             </nav>
-            <button class="btn-signin">Launch App</button>
+            <a href="signin.html" class="btn-signin">Account</a>
         </header>
         <main>
             <div class="content">
                 <h1>Your Wallet</h1>
                 <p class="description">View your balances and manage your assets securely.</p>
-                <div class="buttons">
-                    <button class="btn-get-started">Show Balances</button>
-                    <button class="btn-signing-main">Export Wallet</button>
-                </div>
+                <section class="wallet-section">
+                    <div class="wallet-card">
+                        <div class="wallet-toolbar">
+                            <button id="wallet-refresh-all" class="btn-get-started btn-small">Refresh All</button>
+                        </div>
+                        <table class="wallet-table">
+                            <thead>
+                                <tr>
+                                    <th class="wallet-col-asset">Cryptocurrency</th>
+                                    <th class="wallet-col-balance">Balance</th>
+                                    <th class="wallet-col-value">Value (USD)</th>
+                                    <th class="wallet-col-pl">24h P/L</th>
+                                    <th class="wallet-col-address">Address</th>
+                                    <th class="wallet-col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wallet-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
+    <script>
+    (function () {
+        const DEFAULTS = {
+            BTC: "34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo",
+            ETH: "",
+            SOL: "",
+            DOGE: ""
+        };
+
+        const COIN_META = [
+            { symbol: 'BTC', name: 'Bitcoin', priceId: 'bitcoin', decimals: 8 },
+            { symbol: 'ETH', name: 'Ethereum', priceId: 'ethereum', decimals: 18 },
+            { symbol: 'SOL', name: 'Solana', priceId: 'solana', decimals: 9 },
+            { symbol: 'DOGE', name: 'Dogecoin', priceId: 'dogecoin', decimals: 8 }
+        ];
+
+        function getStoredAddress(symbol) {
+            const key = `wallet_addr_${symbol}`;
+            const stored = localStorage.getItem(key);
+            if (stored && stored.trim()) return stored.trim();
+            return DEFAULTS[symbol] || '';
+        }
+
+        function setStoredAddress(symbol, address) {
+            localStorage.setItem(`wallet_addr_${symbol}`, address);
+        }
+
+        function formatNumber(num, options) {
+            try { return new Intl.NumberFormat('en-US', options).format(num); }
+            catch (_e) { return String(num); }
+        }
+
+        async function fetchPrices() {
+            const ids = COIN_META.map(c => c.priceId).join(',');
+            const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Failed to fetch prices');
+            return res.json();
+        }
+
+        async function fetchBtcBalance(symbol, address) {
+            const res = await fetch(`https://blockstream.info/api/address/${address}`);
+            if (!res.ok) throw new Error('BTC address fetch failed');
+            const data = await res.json();
+            const funded = (data.chain_stats?.funded_txo_sum || 0);
+            const spent = (data.chain_stats?.spent_txo_sum || 0);
+            const confirmedSats = funded - spent;
+            return confirmedSats / 1e8; // BTC
+        }
+
+        async function fetchEthBalance(symbol, address) {
+            if (!address) return 0;
+            const res = await fetch(`https://api.blockchair.com/ethereum/dashboards/address/${address}`);
+            if (!res.ok) throw new Error('ETH address fetch failed');
+            const data = await res.json();
+            const entry = data?.data?.[address]?.address;
+            const balanceWei = entry?.balance ? BigInt(entry.balance) : 0n;
+            const balance = Number(balanceWei) / 1e18;
+            return balance; // ETH
+        }
+
+        async function fetchSolBalance(symbol, address) {
+            if (!address) return 0;
+            const res = await fetch(`https://public-api.solscan.io/account/${address}`);
+            if (!res.ok) throw new Error('SOL address fetch failed');
+            const data = await res.json();
+            const lamports = typeof data?.lamports === 'number' ? data.lamports : 0;
+            return lamports / 1e9; // SOL
+        }
+
+        async function fetchDogeBalance(symbol, address) {
+            if (!address) return 0;
+            const res = await fetch(`https://sochain.com/api/v2/get_address_balance/DOGE/${address}`);
+            if (!res.ok) throw new Error('DOGE address fetch failed');
+            const data = await res.json();
+            const bal = parseFloat(data?.data?.confirmed_balance || '0');
+            return isNaN(bal) ? 0 : bal; // DOGE
+        }
+
+        const fetchers = {
+            BTC: fetchBtcBalance,
+            ETH: fetchEthBalance,
+            SOL: fetchSolBalance,
+            DOGE: fetchDogeBalance
+        };
+
+        function renderRows() {
+            const tbody = document.getElementById('wallet-tbody');
+            tbody.innerHTML = '';
+            COIN_META.forEach(meta => {
+                const address = getStoredAddress(meta.symbol);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="wallet-col-asset">${meta.name} (${meta.symbol})</td>
+                    <td class="wallet-col-balance" id="bal-${meta.symbol}">—</td>
+                    <td class="wallet-col-value" id="usd-${meta.symbol}">—</td>
+                    <td class="wallet-col-pl" id="pl-${meta.symbol}">—</td>
+                    <td class="wallet-col-address wallet-address"><code class="truncate" id="addr-${meta.symbol}">${address || '—'}</code></td>
+                    <td class="wallet-col-actions">
+                        <div class="wallet-actions">
+                            <a id="send-${meta.symbol}" href="send.html?currency=${meta.symbol}${address ? `&address=${address}` : ''}" class="btn-get-started btn-small">Send</a>
+                            <a id="recv-${meta.symbol}" href="receive.html?currency=${meta.symbol}${address ? `&address=${address}` : ''}" class="btn-signing-main btn-small">Receive</a>
+                            <button id="set-${meta.symbol}" class="btn-signing-main btn-small">Set Address</button>
+                            <button id="ref-${meta.symbol}" class="btn-get-started btn-small">Refresh</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function wireActions(prices) {
+            COIN_META.forEach(meta => {
+                const setBtn = document.getElementById(`set-${meta.symbol}`);
+                const refBtn = document.getElementById(`ref-${meta.symbol}`);
+                setBtn.addEventListener('click', () => {
+                    const current = getStoredAddress(meta.symbol);
+                    const addr = prompt(`Enter ${meta.name} address:`, current || '');
+                    if (addr === null) return;
+                    const cleaned = addr.trim();
+                    setStoredAddress(meta.symbol, cleaned);
+                    document.getElementById(`addr-${meta.symbol}`).textContent = cleaned || '—';
+                    const send = document.getElementById(`send-${meta.symbol}`);
+                    const recv = document.getElementById(`recv-${meta.symbol}`);
+                    send.href = `send.html?currency=${meta.symbol}${cleaned ? `&address=${cleaned}` : ''}`;
+                    recv.href = `receive.html?currency=${meta.symbol}${cleaned ? `&address=${cleaned}` : ''}`;
+                    refreshOne(meta, prices);
+                });
+                refBtn.addEventListener('click', () => refreshOne(meta, prices));
+            });
+        }
+
+        async function refreshOne(meta, prices) {
+            const balEl = document.getElementById(`bal-${meta.symbol}`);
+            const usdEl = document.getElementById(`usd-${meta.symbol}`);
+            const plEl = document.getElementById(`pl-${meta.symbol}`);
+            const addr = getStoredAddress(meta.symbol);
+
+            const change = prices?.[meta.priceId]?.usd_24h_change || 0;
+            const sign = change >= 0 ? '+' : '';
+            plEl.textContent = `${sign}${(change).toFixed(2)}%`;
+            plEl.style.color = change >= 0 ? '#22c55e' : '#ef4444';
+
+            if (!addr) {
+                balEl.textContent = '—';
+                usdEl.textContent = '—';
+                return;
+            }
+
+            balEl.textContent = '…';
+            usdEl.textContent = '…';
+            try {
+                const fetcher = fetchers[meta.symbol];
+                const balance = await fetcher(meta.symbol, addr);
+                const priceUsd = prices?.[meta.priceId]?.usd || 0;
+                const valueUsd = balance * priceUsd;
+                balEl.textContent = formatNumber(balance, { maximumFractionDigits: meta.symbol === 'BTC' ? 8 : 6 });
+                usdEl.textContent = `$${formatNumber(valueUsd, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            } catch (e) {
+                console.error(`${meta.symbol} refresh failed`, e);
+                balEl.textContent = 'Error';
+                usdEl.textContent = 'Error';
+                plEl.textContent = '—';
+                plEl.style.color = '';
+            }
+        }
+
+        async function refreshAll() {
+            let prices;
+            try {
+                prices = await fetchPrices();
+            } catch (e) {
+                console.error('Price fetch failed', e);
+                prices = {};
+            }
+            wireActions(prices);
+            COIN_META.forEach(meta => refreshOne(meta, prices));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tbody = document.getElementById('wallet-tbody');
+            if (!tbody) return;
+            renderRows();
+            refreshAll();
+            const refreshAllBtn = document.getElementById('wallet-refresh-all');
+            if (refreshAllBtn) refreshAllBtn.addEventListener('click', refreshAll);
+        });
+    })();
+    </script>
 </body>
 </html>
