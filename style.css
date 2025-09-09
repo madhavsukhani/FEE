@@ -79,6 +79,7 @@ nav a:hover {
 }
 
 .btn-signin {
+    text-decoration: none;
     background-color: #a7a7a7;
     color: black;
     padding: 0.8rem 2rem;
@@ -139,8 +140,8 @@ main {
 }
 
 .content {
-    max-width: 40rem;
-    margin-left: 10%;
+    /* max-width: 40rem; */
+    margin-left: 5%;
 }
 
 .tag-box {
@@ -209,8 +210,8 @@ main {
     overflow: hidden;
     padding: 2.5rem 2rem 2rem 2rem;
     width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
 }
 
 .wallet-toolbar {
@@ -251,11 +252,11 @@ main {
 }
 
 
-.wallet-col-asset { text-align: left; width: 22%; }
-.wallet-col-balance { text-align: right; width: 18%; font-variant-numeric: tabular-nums; }
-.wallet-col-value { text-align: right; width: 18%; font-variant-numeric: tabular-nums; }
-.wallet-col-pl { text-align: right; width: 12%; font-variant-numeric: tabular-nums; }
-.wallet-col-address { text-align: left; width: 20%; }
+ .wallet-col-asset { text-align: left; width: 8%; }
+ .wallet-col-balance { text-align: right; width: 10%; font-variant-numeric: tabular-nums; }
+ .wallet-col-value { text-align: right; width: 10%; font-variant-numeric: tabular-nums; }
+ .wallet-col-pl { text-align: right; width: 7%; font-variant-numeric: tabular-nums; }
+ .wallet-col-address { text-align: left; width: 8%; overflow: hidden; }
 .wallet-col-actions { text-align: right; width: 20%; }
 
 .wallet-address code {
@@ -266,6 +267,22 @@ main {
     padding: 0.18rem 0.5rem;
     border-radius: 8px;
     letter-spacing: 0.03em;
+    display: block;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* For Webkit browsers */
+.wallet-address code::-webkit-scrollbar {
+    height: 4px;
+}
+.wallet-address code::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+.wallet-address code::-webkit-scrollbar-track {
+    background: #232323;
 }
 
 .wallet-address code.truncate {
@@ -283,9 +300,9 @@ main {
 }
 
 .btn-small {
-    padding: 0.45rem 1rem;
-    font-size: 0.95rem;
-    border-radius: 1rem;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.85rem;
+    border-radius: 0.7rem;
 }
 
 @media screen and (max-width: 960px) {
@@ -304,9 +321,9 @@ main {
 .btn-get-started {
     text-decoration: none;
     border: 1px solid #2a2a2a;
-    padding: 0.7rem 1.2rem;
-    border-radius: 50px;
-    font-size: 1.2rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: 0.7rem;
+    font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.1em;
     transition: background-color 0.2s ease;
@@ -321,9 +338,9 @@ main {
     text-decoration: none;
     background-color: lightgray;
     color: black;
-    padding: 0.6rem 2.5rem;
-    border-radius: 50px;
-    font-size: 1.2rem;
+    padding: 0.28rem 0.7rem;
+    border-radius: 0.7rem;
+    font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.1em;
     transition: background-color 0.2s ease;
